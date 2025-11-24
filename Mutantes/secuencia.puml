@@ -1,0 +1,48 @@
+@startuml
+    participant Cliente
+    participant MutantController
+    participant MutantService
+    participant DnaRecordRepository
+    participant Database
+    participant MutantDetector
+
+    Cliente->>MutantController: POST /mutant/ {dna: [...]}
+    activate MutantController
+
+    MutantController->>MutantService: isMutant(dna)
+    activate MutantService
+
+    MutantService->>MutantService: calculateDnaHash(dna)
+
+    MutantService->>DnaRecordRepository: findByDnaHash(hash)
+    activate DnaRecordRepository
+    DnaRecordRepository->>Database: SELECT * WHERE hash = ?
+    Database-->>DnaRecordRepository: (Optional<DnaRecord>)
+    DnaRecordRepository-->>MutantService: result
+    deactivate DnaRecordRepository
+
+    alt El ADN ya existe en BD (Caché)
+        MutantService-->>MutantController: return isMutant (del registro)
+    else El ADN es nuevo
+        MutantService->>MutantDetector: isMutant(dna)
+        activate MutantDetector
+        MutantDetector-->>MutantService: true/false
+        deactivate MutantDetector
+
+        MutantService->>DnaRecordRepository: save(new DnaRecord)
+        activate DnaRecordRepository
+        DnaRecordRepository->>Database: INSERT INTO dna_records...
+        deactivate DnaRecordRepository
+
+        MutantService-->>MutantController: true/false
+    end
+
+    deactivate MutantService
+
+    alt Es Mutante
+        MutantController-->>Cliente: 200 OK
+    else Es Humano
+        MutantController-->>Cliente: 403 Forbidden
+    end
+    deactivate MutantController
+@enduml
