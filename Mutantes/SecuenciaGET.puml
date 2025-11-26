@@ -1,0 +1,43 @@
+@startuml
+
+actor "Cliente" as User
+participant "MutantController" as Controller
+participant "StatsService" as Service
+participant "DnaRecordRepository" as Repo
+database "H2 Database" as DB
+
+User -> Controller: GET /stats
+activate Controller
+
+Controller -> Service: getStats()
+activate Service
+
+' Paso 1: Contar Mutantes
+Service -> Repo: countByIsMutant(true)
+activate Repo
+Repo -> DB: SELECT COUNT(*) WHERE is_mutant = true
+DB --> Repo: countMutant (long)
+Repo --> Service: countMutant
+deactivate Repo
+
+' Paso 2: Contar Humanos
+Service -> Repo: countByIsMutant(false)
+activate Repo
+Repo -> DB: SELECT COUNT(*) WHERE is_mutant = false
+DB --> Repo: countHuman (long)
+Repo --> Service: countHuman
+deactivate Repo
+
+' Paso 3: Calcular Ratio
+note right of Service
+    ratio = countHuman == 0 ? 0 :
+    (countMutant / countHuman)
+end note
+
+Service --> Controller: StatsResponse (counts + ratio)
+deactivate Service
+
+Controller --> User: HTTP 200 OK {JSON}
+deactivate Controller
+
+@enduml
